@@ -72,6 +72,9 @@ builder.Services.AddScoped<IReconhecimentoService, ReconhecimentoService>();
 builder.Services.AddScoped<ISentimentosService, SentimentosService>();
 builder.Services.AddScoped<IRelatorioService, RelatorioService>();
 
+// ML.NET Prediction Service (Singleton para reutilizar o modelo)
+builder.Services.AddSingleton<MLPredictionService>();
+
 // JWT Authentication Configuration
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var secretKey = jwtSettings["SecretKey"] 

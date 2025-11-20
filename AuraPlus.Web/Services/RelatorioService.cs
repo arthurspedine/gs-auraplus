@@ -11,6 +11,7 @@ public class RelatorioService : IRelatorioService
     private readonly IEquipeRepository _equipeRepository;
     private readonly IReconhecimentoRepository _reconhecimentoRepository;
     private readonly ISentimentosRepository _sentimentosRepository;
+    private readonly MLPredictionService _mlPredictionService;
     private readonly ILogger<RelatorioService> _logger;
 
     public RelatorioService(
@@ -19,6 +20,7 @@ public class RelatorioService : IRelatorioService
         IEquipeRepository equipeRepository,
         IReconhecimentoRepository reconhecimentoRepository,
         ISentimentosRepository sentimentosRepository,
+        MLPredictionService mlPredictionService,
         ILogger<RelatorioService> logger)
     {
         _relatorioRepository = relatorioRepository;
@@ -26,6 +28,7 @@ public class RelatorioService : IRelatorioService
         _equipeRepository = equipeRepository;
         _reconhecimentoRepository = reconhecimentoRepository;
         _sentimentosRepository = sentimentosRepository;
+        _mlPredictionService = mlPredictionService;
         _logger = logger;
     }
 
@@ -53,23 +56,56 @@ public class RelatorioService : IRelatorioService
         // Calcular pontuação média de sentimentos
         var pontuacaoMedia = await _sentimentosRepository.GetPontuacaoMediaAsync(usuarioId, dataInicio, dataFim);
 
-        var descritivo = $"Reconhecimentos recebidos: {numeroIndicacoes}. ";
+        // Obter dados da equipe para ML
+        var equipe = await _equipeRepository.GetByIdAsync(usuario.IdEquipe.Value);
+        var totalMembrosEquipe = equipe?.Users?.Count(u => u.Ativo == '1') ?? 1;
+        var diasAtivos = 30;
+        var taxaParticipacao = 100.0f;
+
+        // Calcular taxa de participação (pessoas com sentimento registrado)
+        if (equipe?.Users != null && equipe.Users.Any())
+        {
+            var usuariosComSentimento = 0;
+            foreach (var membro in equipe.Users.Where(u => u.Ativo == '1'))
+            {
+                var temSentimento = await _sentimentosRepository.GetPontuacaoMediaAsync(membro.Id, dataInicio, dataFim);
+                if (temSentimento.HasValue)
+                    usuariosComSentimento++;
+            }
+            taxaParticipacao = totalMembrosEquipe > 0 ? (usuariosComSentimento * 100.0f) / totalMembrosEquipe : 0;
+        }
+
+        // Usar ML para prever engajamento pessoal
+        var sentimentoParaML = pontuacaoMedia.HasValue ? (float)pontuacaoMedia.Value : 5.0f;
+        var engajamentoPrevisto = _mlPredictionService.PreverEngajamentoEquipe(
+            numeroMembros: totalMembrosEquipe,
+            reconhecimentosMes: numeroIndicacoes,
+            sentimentoMedio: sentimentoParaML,
+            taxaParticipacao: taxaParticipacao,
+            diasAtivos: diasAtivos
+        );
+
+        var classificacao = _mlPredictionService.ClassificarEngajamento(engajamentoPrevisto);
+        var recomendacoes = _mlPredictionService.GerarRecomendacoes(engajamentoPrevisto, sentimentoParaML, numeroIndicacoes);
+
+        var descritivo = $"📊 Análise ML: {classificacao}\n\n";
+        descritivo += $"Reconhecimentos recebidos: {numeroIndicacoes}. ";
+        
         if (pontuacaoMedia.HasValue)
         {
             descritivo += $"Sentimento médio: {pontuacaoMedia.Value:F2}/10. ";
-            
-            if (pontuacaoMedia.Value >= 8)
-                descritivo += "Excelente engajamento!";
-            else if (pontuacaoMedia.Value >= 6)
-                descritivo += "Bom engajamento.";
-            else if (pontuacaoMedia.Value >= 4)
-                descritivo += "Atenção: engajamento moderado.";
-            else
-                descritivo += "Atenção: baixo engajamento.";
         }
         else
         {
-            descritivo += "Nenhum sentimento registrado no período.";
+            descritivo += "Nenhum sentimento registrado no período. ";
+        }
+
+        descritivo += $"\n\n🎯 Engajamento previsto: {engajamentoPrevisto:F2}%\n\n";
+
+        if (recomendacoes.Any())
+        {
+            descritivo += "💡 Recomendações:\n";
+            descritivo += string.Join("\n", recomendacoes);
         }
 
         var relatorio = new RelatorioPessoa
@@ -110,28 +146,68 @@ public class RelatorioService : IRelatorioService
         // Calcular sentimento médio da equipe
         var pontuacaoMedia = await _sentimentosRepository.GetPontuacaoMediaEquipeAsync(equipeId, dataInicio, dataFim);
 
+        // Calcular reconhecimentos totais da equipe no mês
+        var reconhecimentosMes = 0;
+        var diasAtivos = 30;
+        var usuariosComSentimento = 0;
+
+        if (equipe.Users != null)
+        {
+            foreach (var usuario in equipe.Users.Where(u => u.Ativo == '1'))
+            {
+                var recsRecebidos = await _reconhecimentoRepository.GetTotalReconhecimentosRecebidosAsync(usuario.Id, dataInicio, dataFim);
+                reconhecimentosMes += recsRecebidos;
+
+                var temSentimento = await _sentimentosRepository.GetPontuacaoMediaAsync(usuario.Id, dataInicio, dataFim);
+                if (temSentimento.HasValue)
+                    usuariosComSentimento++;
+            }
+        }
+
+        var taxaParticipacao = totalMembros > 0 ? (usuariosComSentimento * 100.0f) / totalMembros : 0;
+        var sentimentoParaML = pontuacaoMedia.HasValue ? (float)pontuacaoMedia.Value : 5.0f;
+
+        // Usar ML para prever engajamento da equipe
+        var engajamentoPrevisto = _mlPredictionService.PreverEngajamentoEquipe(
+            numeroMembros: totalMembros,
+            reconhecimentosMes: reconhecimentosMes,
+            sentimentoMedio: sentimentoParaML,
+            taxaParticipacao: taxaParticipacao,
+            diasAtivos: diasAtivos
+        );
+
+        var classificacao = _mlPredictionService.ClassificarEngajamento(engajamentoPrevisto);
+        var recomendacoes = _mlPredictionService.GerarRecomendacoes(engajamentoPrevisto, sentimentoParaML, reconhecimentosMes);
+
         string sentimentoMedio;
         string descritivo;
 
+        sentimentoMedio = pontuacaoMedia.HasValue 
+            ? (pontuacaoMedia.Value >= 8 ? "Excelente" :
+               pontuacaoMedia.Value >= 6 ? "Bom" :
+               pontuacaoMedia.Value >= 4 ? "Regular" : "Crítico")
+            : "Sem dados";
+
+        descritivo = $"📊 Análise ML: {classificacao}\n\n";
+        descritivo += $"Equipe com {totalMembros} membros. ";
+        descritivo += $"Reconhecimentos no mês: {reconhecimentosMes}. ";
+        descritivo += $"Taxa de participação: {taxaParticipacao:F1}%.\n";
+
         if (pontuacaoMedia.HasValue)
         {
-            sentimentoMedio = pontuacaoMedia.Value >= 8 ? "Excelente" :
-                             pontuacaoMedia.Value >= 6 ? "Bom" :
-                             pontuacaoMedia.Value >= 4 ? "Regular" : "Crítico";
-
-            descritivo = $"Equipe com {totalMembros} membros. Sentimento médio: {pontuacaoMedia.Value:F2}/10 ({sentimentoMedio}). ";
-
-            if (pontuacaoMedia.Value >= 7)
-                descritivo += "Equipe engajada e motivada!";
-            else if (pontuacaoMedia.Value >= 5)
-                descritivo += "Equipe com engajamento moderado.";
-            else
-                descritivo += "Atenção: equipe necessita de intervenções para melhorar engajamento.";
+            descritivo += $"Sentimento médio: {pontuacaoMedia.Value:F2}/10 ({sentimentoMedio}).\n";
         }
         else
         {
-            sentimentoMedio = "Sem dados";
-            descritivo = $"Equipe com {totalMembros} membros. Nenhum sentimento registrado no período.";
+            descritivo += "Nenhum sentimento registrado no período.\n";
+        }
+
+        descritivo += $"\n🎯 Engajamento previsto: {engajamentoPrevisto:F2}%\n\n";
+
+        if (recomendacoes.Any())
+        {
+            descritivo += "💡 Recomendações:\n";
+            descritivo += string.Join("\n", recomendacoes);
         }
 
         var relatorio = new RelatorioEquipe
