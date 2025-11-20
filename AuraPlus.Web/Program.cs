@@ -16,26 +16,6 @@ using AuraPlus.Web.Services;
 using AuraPlus.Web.HealthCheck;
 using AuraPlus.Web.Tracing;
 
-// Método estático para configuração do banco de dados
-static void ConfigureDatabase(IServiceCollection services, IConfiguration configuration)
-{
-    // Verifica se está em ambiente de testes (variável de ambiente ou configuração)
-    var useInMemoryDatabase = configuration.GetValue<bool>("UseInMemoryDatabase", false);
-    
-    if (useInMemoryDatabase)
-    {
-        // Usa InMemory Database para testes
-        services.AddDbContext<OracleDbContext>(options =>
-            options.UseInMemoryDatabase("AuraPlusTestDb"));
-    }
-    else
-    {
-        // Usa Oracle em produção/desenvolvimento
-        services.AddDbContext<OracleDbContext>(options =>
-            options.UseOracle(configuration.GetConnectionString("OracleConnection")));
-    }
-}
-
 var builder = WebApplication.CreateBuilder(args);
 
 const string serviceName = "AuraPlus.Api";
@@ -57,8 +37,9 @@ builder.Services.AddOpenTelemetry()
             opts.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
         }));
 
-// Database Configuration
-ConfigureDatabase(builder.Services, builder.Configuration);
+// Database Configuration - Oracle apenas
+builder.Services.AddDbContext<OracleDbContext>(options =>
+    options.UseOracle(builder.Configuration.GetConnectionString("OracleConnection")));
 
 // Repository and Service Registration
 builder.Services.AddScoped<IUserRepository, UserRepository>();
