@@ -63,8 +63,14 @@ ConfigureDatabase(builder.Services, builder.Configuration);
 // Repository and Service Registration
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IEquipeRepository, EquipeRepository>();
+builder.Services.AddScoped<IReconhecimentoRepository, ReconhecimentoRepository>();
+builder.Services.AddScoped<ISentimentosRepository, SentimentosRepository>();
+builder.Services.AddScoped<IRelatorioRepository, RelatorioRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEquipeService, EquipeService>();
+builder.Services.AddScoped<IReconhecimentoService, ReconhecimentoService>();
+builder.Services.AddScoped<ISentimentosService, SentimentosService>();
+builder.Services.AddScoped<IRelatorioService, RelatorioService>();
 
 // JWT Authentication Configuration
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
