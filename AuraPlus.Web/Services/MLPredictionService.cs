@@ -81,37 +81,39 @@ public class MLPredictionService
     }
 
     /// <summary>
-    /// Gera recomendações baseadas no nível de engajamento previsto
+    /// Gera recomendações baseadas no nível de engajamento previsto (máximo 250 caracteres)
     /// </summary>
-    public List<string> GerarRecomendacoes(float nivelEngajamento, float sentimentoMedio, int reconhecimentos)
+    public string GerarRecomendacoes(float nivelEngajamento, float sentimentoMedio, int reconhecimentos)
     {
         var recomendacoes = new List<string>();
 
         if (nivelEngajamento < 60)
         {
-            recomendacoes.Add("⚠️ Considere realizar atividades de team building");
+            recomendacoes.Add("Realizar atividades de team building");
         }
 
         if (sentimentoMedio < 6.0f)
         {
-            recomendacoes.Add("😔 Sentimento da equipe está baixo - agende conversas individuais");
+            recomendacoes.Add("Sentimento baixo - agendar conversas individuais");
         }
 
         if (reconhecimentos < 10)
         {
-            recomendacoes.Add("👏 Incentive mais reconhecimentos entre os membros");
+            recomendacoes.Add("Incentivar mais reconhecimentos");
         }
 
         if (nivelEngajamento >= 90)
         {
-            recomendacoes.Add("🎉 Excelente trabalho! Continue mantendo este nível");
+            recomendacoes.Add("Excelente! Manter este nivel");
         }
 
         if (nivelEngajamento >= 75 && nivelEngajamento < 90)
         {
-            recomendacoes.Add("✅ Bom engajamento - considere compartilhar as boas práticas");
+            recomendacoes.Add("Bom engajamento - compartilhar boas praticas");
         }
 
-        return recomendacoes;
+        // Limitar a 250 caracteres para caber no banco Oracle
+        var texto = string.Join("; ", recomendacoes);
+        return texto.Length > 250 ? texto.Substring(0, 247) + "..." : texto;
     }
 }

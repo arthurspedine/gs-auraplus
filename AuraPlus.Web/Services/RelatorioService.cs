@@ -88,25 +88,24 @@ public class RelatorioService : IRelatorioService
         var classificacao = _mlPredictionService.ClassificarEngajamento(engajamentoPrevisto);
         var recomendacoes = _mlPredictionService.GerarRecomendacoes(engajamentoPrevisto, sentimentoParaML, numeroIndicacoes);
 
-        var descritivo = $"📊 Análise ML: {classificacao}\n\n";
-        descritivo += $"Reconhecimentos recebidos: {numeroIndicacoes}. ";
+        var descritivo = $"Analise ML: {classificacao}. ";
+        descritivo += $"Reconhecimentos: {numeroIndicacoes}. ";
         
         if (pontuacaoMedia.HasValue)
         {
-            descritivo += $"Sentimento médio: {pontuacaoMedia.Value:F2}/10. ";
-        }
-        else
-        {
-            descritivo += "Nenhum sentimento registrado no período. ";
+            descritivo += $"Sentimento: {pontuacaoMedia.Value:F2}/10. ";
         }
 
-        descritivo += $"\n\n🎯 Engajamento previsto: {engajamentoPrevisto:F2}%\n\n";
+        descritivo += $"Engajamento: {engajamentoPrevisto:F2}%. ";
 
-        if (recomendacoes.Any())
+        if (!string.IsNullOrEmpty(recomendacoes))
         {
-            descritivo += "💡 Recomendações:\n";
-            descritivo += string.Join("\n", recomendacoes);
+            descritivo += $"Recomendacoes: {recomendacoes}";
         }
+
+        // Limitar a 250 caracteres
+        if (descritivo.Length > 250)
+            descritivo = descritivo.Substring(0, 247) + "...";
 
         var relatorio = new RelatorioPessoa
         {
@@ -185,30 +184,29 @@ public class RelatorioService : IRelatorioService
         sentimentoMedio = pontuacaoMedia.HasValue 
             ? (pontuacaoMedia.Value >= 8 ? "Excelente" :
                pontuacaoMedia.Value >= 6 ? "Bom" :
-               pontuacaoMedia.Value >= 4 ? "Regular" : "Crítico")
+               pontuacaoMedia.Value >= 4 ? "Regular" : "Critico")
             : "Sem dados";
 
-        descritivo = $"📊 Análise ML: {classificacao}\n\n";
-        descritivo += $"Equipe com {totalMembros} membros. ";
-        descritivo += $"Reconhecimentos no mês: {reconhecimentosMes}. ";
-        descritivo += $"Taxa de participação: {taxaParticipacao:F1}%.\n";
+        descritivo = $"Analise ML: {classificacao}. ";
+        descritivo += $"Equipe: {totalMembros} membros. ";
+        descritivo += $"Reconhecimentos: {reconhecimentosMes}. ";
+        descritivo += $"Participacao: {taxaParticipacao:F1}%. ";
 
         if (pontuacaoMedia.HasValue)
         {
-            descritivo += $"Sentimento médio: {pontuacaoMedia.Value:F2}/10 ({sentimentoMedio}).\n";
-        }
-        else
-        {
-            descritivo += "Nenhum sentimento registrado no período.\n";
+            descritivo += $"Sentimento: {pontuacaoMedia.Value:F2}/10. ";
         }
 
-        descritivo += $"\n🎯 Engajamento previsto: {engajamentoPrevisto:F2}%\n\n";
+        descritivo += $"Engajamento: {engajamentoPrevisto:F2}%. ";
 
-        if (recomendacoes.Any())
+        if (!string.IsNullOrEmpty(recomendacoes))
         {
-            descritivo += "💡 Recomendações:\n";
-            descritivo += string.Join("\n", recomendacoes);
+            descritivo += $"Recomendacoes: {recomendacoes}";
         }
+
+        // Limitar a 250 caracteres
+        if (descritivo.Length > 250)
+            descritivo = descritivo.Substring(0, 247) + "...";
 
         var relatorio = new RelatorioEquipe
         {

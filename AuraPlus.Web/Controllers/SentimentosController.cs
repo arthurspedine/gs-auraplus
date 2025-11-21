@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AuraPlus.Web.Models.DTOs.Sentimentos;
+using AuraPlus.Web.Models.Common;
 using AuraPlus.Web.Services;
 using System.Net;
 
@@ -79,18 +80,33 @@ public class SentimentosController : ControllerBase
     }
 
     /// <summary>
-    /// Listar todos os sentimentos do usuário autenticado
+    /// Listar todos os sentimentos do usuário autenticado com paginação
     /// </summary>
+    /// <param name="page">Número da página (padrão: 1)</param>
+    /// <param name="pageSize">Tamanho da página (padrão: 10, máximo: 100)</param>
     [HttpGet("meus")]
-    [ProducesResponseType(typeof(IEnumerable<SentimentoDTO>), (int)HttpStatusCode.OK)]
-    public async Task<ActionResult<IEnumerable<SentimentoDTO>>> GetMeusSentimentos()
+    [ProducesResponseType(typeof(PagedResult<SentimentoDTO>), (int)HttpStatusCode.OK)]
+    public async Task<ActionResult<PagedResult<SentimentoDTO>>> GetMeusSentimentos([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         try
         {
             var usuarioId = GetAuthenticatedUserId();
-            var sentimentos = await _sentimentosService.GetSentimentosUsuarioAsync(usuarioId);
+            var allSentimentos = await _sentimentosService.GetSentimentosUsuarioAsync(usuarioId);
+            var totalCount = allSentimentos.Count();
             
-            return Ok(sentimentos);
+            var pagedData = allSentimentos
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            var result = new PagedResult<SentimentoDTO>(pagedData, page, pageSize, totalCount);
+            
+            var baseUrl = $"{Request.Scheme}://{Request.Host}{Request.Path}";
+            var hateoasLinks = new HateoasLinks();
+            hateoasLinks.AddPaginationLinks(baseUrl, page, result.TotalPages, pageSize);
+            result.Links = hateoasLinks.Links;
+            
+            return Ok(result);
         }
         catch (Exception ex)
         {

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AuraPlus.Web.Models.DTOs.Equipe;
+using AuraPlus.Web.Models.Common;
 using AuraPlus.Web.Services;
 using System.Net;
 
@@ -63,20 +64,37 @@ public class EquipeController : ControllerBase
     }
 
     /// <summary>
-    /// Lista todas as equipes
+    /// Lista todas as equipes com paginação e HATEOAS
     /// </summary>
-    /// <returns>Lista de equipes</returns>
+    /// <param name="page">Número da página (padrão: 1)</param>
+    /// <param name="pageSize">Tamanho da página (padrão: 10, máximo: 100)</param>
+    /// <returns>Lista paginada de equipes com links HATEOAS</returns>
     /// <response code="200">Lista retornada com sucesso</response>
     /// <response code="401">Não autorizado</response>
     [HttpGet]
-    [ProducesResponseType(typeof(IEnumerable<EquipeDTO>), (int)HttpStatusCode.OK)]
+    [ProducesResponseType(typeof(PagedResult<EquipeDTO>), (int)HttpStatusCode.OK)]
     [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
-    public async Task<ActionResult<IEnumerable<EquipeDTO>>> GetAll()
+    public async Task<ActionResult<PagedResult<EquipeDTO>>> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         try
         {
-            var equipes = await _equipeService.GetAllEquipesAsync();
-            return Ok(equipes);
+            var allEquipes = await _equipeService.GetAllEquipesAsync();
+            var totalCount = allEquipes.Count();
+            
+            var pagedEquipes = allEquipes
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            var result = new PagedResult<EquipeDTO>(pagedEquipes, page, pageSize, totalCount);
+            
+            // Adicionar links HATEOAS
+            var baseUrl = $"{Request.Scheme}://{Request.Host}{Request.Path}";
+            var hateoasLinks = new HateoasLinks();
+            hateoasLinks.AddPaginationLinks(baseUrl, page, result.TotalPages, pageSize);
+            result.Links = hateoasLinks.Links;
+
+            return Ok(result);
         }
         catch (Exception ex)
         {

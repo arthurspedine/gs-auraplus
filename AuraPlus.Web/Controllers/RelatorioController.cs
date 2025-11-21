@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AuraPlus.Web.Models.DTOs.Relatorio;
+using AuraPlus.Web.Models.Common;
 using AuraPlus.Web.Services;
 using System.Net;
 
@@ -131,18 +132,33 @@ public class RelatorioController : ControllerBase
     }
 
     /// <summary>
-    /// Listar histórico de relatórios pessoais do usuário autenticado
+    /// Listar histórico de relatórios pessoais do usuário autenticado com paginação
     /// </summary>
+    /// <param name="page">Número da página (padrão: 1)</param>
+    /// <param name="pageSize">Tamanho da página (padrão: 10, máximo: 100)</param>
     [HttpGet("pessoa/historico")]
-    [ProducesResponseType(typeof(IEnumerable<RelatorioPessoaDTO>), (int)HttpStatusCode.OK)]
-    public async Task<ActionResult<IEnumerable<RelatorioPessoaDTO>>> GetHistoricoRelatorioPessoa()
+    [ProducesResponseType(typeof(PagedResult<RelatorioPessoaDTO>), (int)HttpStatusCode.OK)]
+    public async Task<ActionResult<PagedResult<RelatorioPessoaDTO>>> GetHistoricoRelatorioPessoa([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         try
         {
             var usuarioId = GetAuthenticatedUserId();
-            var relatorios = await _relatorioService.GetRelatoriosPessoaUsuarioAsync(usuarioId);
+            var allRelatorios = await _relatorioService.GetRelatoriosPessoaUsuarioAsync(usuarioId);
+            var totalCount = allRelatorios.Count();
             
-            return Ok(relatorios);
+            var pagedData = allRelatorios
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            var result = new PagedResult<RelatorioPessoaDTO>(pagedData, page, pageSize, totalCount);
+            
+            var baseUrl = $"{Request.Scheme}://{Request.Host}{Request.Path}";
+            var hateoasLinks = new HateoasLinks();
+            hateoasLinks.AddPaginationLinks(baseUrl, page, result.TotalPages, pageSize);
+            result.Links = hateoasLinks.Links;
+            
+            return Ok(result);
         }
         catch (Exception ex)
         {
@@ -152,17 +168,33 @@ public class RelatorioController : ControllerBase
     }
 
     /// <summary>
-    /// Listar histórico de relatórios da equipe
+    /// Listar histórico de relatórios da equipe com paginação
     /// </summary>
+    /// <param name="equipeId">ID da equipe</param>
+    /// <param name="page">Número da página (padrão: 1)</param>
+    /// <param name="pageSize">Tamanho da página (padrão: 10, máximo: 100)</param>
     [HttpGet("equipe/historico/{equipeId}")]
-    [ProducesResponseType(typeof(IEnumerable<RelatorioEquipeDTO>), (int)HttpStatusCode.OK)]
-    public async Task<ActionResult<IEnumerable<RelatorioEquipeDTO>>> GetHistoricoRelatorioEquipe(int equipeId)
+    [ProducesResponseType(typeof(PagedResult<RelatorioEquipeDTO>), (int)HttpStatusCode.OK)]
+    public async Task<ActionResult<PagedResult<RelatorioEquipeDTO>>> GetHistoricoRelatorioEquipe(int equipeId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         try
         {
-            var relatorios = await _relatorioService.GetRelatoriosEquipeAsync(equipeId);
+            var allRelatorios = await _relatorioService.GetRelatoriosEquipeAsync(equipeId);
+            var totalCount = allRelatorios.Count();
             
-            return Ok(relatorios);
+            var pagedData = allRelatorios
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            var result = new PagedResult<RelatorioEquipeDTO>(pagedData, page, pageSize, totalCount);
+            
+            var baseUrl = $"{Request.Scheme}://{Request.Host}{Request.Path}";
+            var hateoasLinks = new HateoasLinks();
+            hateoasLinks.AddPaginationLinks(baseUrl, page, result.TotalPages, pageSize);
+            result.Links = hateoasLinks.Links;
+            
+            return Ok(result);
         }
         catch (Exception ex)
         {

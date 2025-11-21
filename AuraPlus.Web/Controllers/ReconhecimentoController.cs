@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AuraPlus.Web.Models.DTOs.Reconhecimento;
+using AuraPlus.Web.Models.Common;
 using AuraPlus.Web.Services;
 using System.Net;
 
@@ -79,18 +80,33 @@ public class ReconhecimentoController : ControllerBase
     }
 
     /// <summary>
-    /// Listar reconhecimentos enviados pelo usuário autenticado
+    /// Listar reconhecimentos enviados pelo usuário autenticado com paginação
     /// </summary>
+    /// <param name="page">Número da página (padrão: 1)</param>
+    /// <param name="pageSize">Tamanho da página (padrão: 10, máximo: 100)</param>
     [HttpGet("enviados")]
-    [ProducesResponseType(typeof(IEnumerable<ReconhecimentoDTO>), (int)HttpStatusCode.OK)]
-    public async Task<ActionResult<IEnumerable<ReconhecimentoDTO>>> GetEnviados()
+    [ProducesResponseType(typeof(PagedResult<ReconhecimentoDTO>), (int)HttpStatusCode.OK)]
+    public async Task<ActionResult<PagedResult<ReconhecimentoDTO>>> GetEnviados([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         try
         {
             var usuarioId = GetAuthenticatedUserId();
-            var reconhecimentos = await _reconhecimentoService.GetReconhecimentosEnviadosAsync(usuarioId);
+            var allReconhecimentos = await _reconhecimentoService.GetReconhecimentosEnviadosAsync(usuarioId);
+            var totalCount = allReconhecimentos.Count();
             
-            return Ok(reconhecimentos);
+            var pagedData = allReconhecimentos
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            var result = new PagedResult<ReconhecimentoDTO>(pagedData, page, pageSize, totalCount);
+            
+            var baseUrl = $"{Request.Scheme}://{Request.Host}{Request.Path}";
+            var hateoasLinks = new HateoasLinks();
+            hateoasLinks.AddPaginationLinks(baseUrl, page, result.TotalPages, pageSize);
+            result.Links = hateoasLinks.Links;
+            
+            return Ok(result);
         }
         catch (Exception ex)
         {
@@ -100,18 +116,33 @@ public class ReconhecimentoController : ControllerBase
     }
 
     /// <summary>
-    /// Listar reconhecimentos recebidos pelo usuário autenticado
+    /// Listar reconhecimentos recebidos pelo usuário autenticado com paginação
     /// </summary>
+    /// <param name="page">Número da página (padrão: 1)</param>
+    /// <param name="pageSize">Tamanho da página (padrão: 10, máximo: 100)</param>
     [HttpGet("recebidos")]
-    [ProducesResponseType(typeof(IEnumerable<ReconhecimentoDTO>), (int)HttpStatusCode.OK)]
-    public async Task<ActionResult<IEnumerable<ReconhecimentoDTO>>> GetRecebidos()
+    [ProducesResponseType(typeof(PagedResult<ReconhecimentoDTO>), (int)HttpStatusCode.OK)]
+    public async Task<ActionResult<PagedResult<ReconhecimentoDTO>>> GetRecebidos([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         try
         {
             var usuarioId = GetAuthenticatedUserId();
-            var reconhecimentos = await _reconhecimentoService.GetReconhecimentosRecebidosAsync(usuarioId);
+            var allReconhecimentos = await _reconhecimentoService.GetReconhecimentosRecebidosAsync(usuarioId);
+            var totalCount = allReconhecimentos.Count();
             
-            return Ok(reconhecimentos);
+            var pagedData = allReconhecimentos
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            var result = new PagedResult<ReconhecimentoDTO>(pagedData, page, pageSize, totalCount);
+            
+            var baseUrl = $"{Request.Scheme}://{Request.Host}{Request.Path}";
+            var hateoasLinks = new HateoasLinks();
+            hateoasLinks.AddPaginationLinks(baseUrl, page, result.TotalPages, pageSize);
+            result.Links = hateoasLinks.Links;
+            
+            return Ok(result);
         }
         catch (Exception ex)
         {

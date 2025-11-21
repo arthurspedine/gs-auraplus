@@ -199,13 +199,112 @@ DELETE /api/v1/Sentimentos/{id}             # Deletar sentimento próprio
 
 ### Relatórios (com ML.NET)
 ```
-POST   /api/v1/Relatorio/pessoa             # Gerar relatório pessoal (30 dias)
-POST   /api/v1/Relatorio/equipe/{id}        # Gerar relatório de equipe (30 dias)
-GET    /api/v1/Relatorio/pessoa/{id}        # Obter relatório pessoa por ID
-GET    /api/v1/Relatorio/equipe/{id}        # Obter relatório equipe por ID
-GET    /api/v1/Relatorio/pessoa/historico   # Histórico de relatórios pessoais
-GET    /api/v1/Relatorio/equipe/historico/{equipeId}  # Histórico equipe
+POST   /api/v1/Relatorio/pessoa                        # Gerar relatório pessoal (30 dias)
+POST   /api/v1/Relatorio/equipe/{id}                   # Gerar relatório de equipe (30 dias)
+GET    /api/v1/Relatorio/pessoa/{id}                   # Obter relatório pessoa por ID
+GET    /api/v1/Relatorio/equipe/{id}                   # Obter relatório equipe por ID
+GET    /api/v1/Relatorio/pessoa/historico              # Histórico paginado + HATEOAS
+GET    /api/v1/Relatorio/equipe/historico/{equipeId}   # Histórico paginado + HATEOAS
 ```
+
+**Parâmetros de Paginação (Query String):**
+- `page` - Número da página (padrão: 1)
+- `pageSize` - Itens por página (padrão: 10, máximo: 100)
+
+## 📄 Paginação e HATEOAS
+
+Todos os endpoints GET que retornam listas implementam **paginação** e **HATEOAS** (Hypermedia as the Engine of Application State).
+
+### Endpoints com Paginação
+
+✅ **GET /api/v1/Equipe** - Lista de equipes
+✅ **GET /api/v1/Reconhecimento/enviados** - Reconhecimentos enviados
+✅ **GET /api/v1/Reconhecimento/recebidos** - Reconhecimentos recebidos
+✅ **GET /api/v1/Sentimentos/meus** - Meus sentimentos
+✅ **GET /api/v1/Relatorio/pessoa/historico** - Histórico relatórios pessoa
+✅ **GET /api/v1/Relatorio/equipe/historico/{id}** - Histórico relatórios equipe
+
+### Exemplo de Requisição com Paginação
+
+```bash
+GET /api/v1/Equipe?page=2&pageSize=5
+Authorization: Bearer {token}
+```
+
+### Exemplo de Resposta com HATEOAS
+
+```json
+{
+  "data": [
+    {
+      "id": 6,
+      "nmTime": "Backend Team",
+      "descricao": "Equipe de desenvolvimento backend"
+    },
+    {
+      "id": 7,
+      "nmTime": "Frontend Team",
+      "descricao": "Equipe de desenvolvimento frontend"
+    }
+  ],
+  "page": 2,
+  "pageSize": 5,
+  "totalCount": 23,
+  "totalPages": 5,
+  "hasPrevious": true,
+  "hasNext": true,
+  "links": [
+    {
+      "href": "https://localhost:5186/api/v1/Equipe?page=2&pageSize=5",
+      "rel": "self",
+      "method": "GET"
+    },
+    {
+      "href": "https://localhost:5186/api/v1/Equipe?page=1&pageSize=5",
+      "rel": "first",
+      "method": "GET"
+    },
+    {
+      "href": "https://localhost:5186/api/v1/Equipe?page=1&pageSize=5",
+      "rel": "previous",
+      "method": "GET"
+    },
+    {
+      "href": "https://localhost:5186/api/v1/Equipe?page=3&pageSize=5",
+      "rel": "next",
+      "method": "GET"
+    },
+    {
+      "href": "https://localhost:5186/api/v1/Equipe?page=5&pageSize=5",
+      "rel": "last",
+      "method": "GET"
+    }
+  ]
+}
+```
+
+### Metadados de Paginação
+
+| Campo | Descrição |
+|-------|-----------|
+| `data` | Array com os itens da página atual |
+| `page` | Número da página atual |
+| `pageSize` | Quantidade de itens por página |
+| `totalCount` | Total de itens disponíveis |
+| `totalPages` | Total de páginas |
+| `hasPrevious` | Indica se existe página anterior |
+| `hasNext` | Indica se existe próxima página |
+| `links` | Array de links HATEOAS para navegação |
+
+### Links HATEOAS
+
+| Rel | Descrição |
+|-----|-----------|
+| `self` | Link para a página atual |
+| `first` | Link para a primeira página |
+| `previous` | Link para a página anterior (se existir) |
+| `next` | Link para a próxima página (se existir) |
+| `last` | Link para a última página |
 
 ## 🤖 Machine Learning - Predição de Engajamento
 
