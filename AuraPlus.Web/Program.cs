@@ -154,6 +154,90 @@ Para acessar os endpoints protegidos:
 5. Clique em **Authorize** e feche o modal"
     });
 
+    c.SwaggerDoc("v2", new OpenApiInfo 
+    { 
+        Title = "AuraPlus REST API - v2", 
+        Version = "v2.0",
+        Description = @"API RESTful para gestão de bem-estar e reconhecimento de equipes utilizando .NET 9.
+
+## Versão 2.0 - Melhorias
+
+Esta versão adiciona funcionalidades aprimoradas de reconhecimento em massa.
+
+### 🆕 Novidades da v2:
+- **Reconhecimento em Massa**: `POST /api/v2/Reconhecimento/em-massa`
+  - Reconhecer **múltiplas pessoas** de uma vez (máximo 10)
+  - Uma requisição, vários reconhecimentos
+  - Retorno detalhado com sucessos e falhas individuais
+  - Validações mantidas: mesma equipe, 1x por mês por pessoa
+
+### Benefícios:
+✅ **Performance**: Uma transação ao invés de N requisições
+✅ **UX**: Reconhecer toda equipe após conquista
+✅ **Atomicidade Individual**: Continua processando mesmo se um falhar
+✅ **Feedback Detalhado**: Status individual de cada reconhecimento
+
+### Exemplo de Uso:
+```json
+POST /api/v2/Reconhecimento/em-massa
+{
+  ""reconhecimentos"": [
+    {
+      ""titulo"": ""Ótimo trabalho!"",
+      ""descricao"": ""Excelente apresentação"",
+      ""idReceptor"": 5
+    },
+    {
+      ""titulo"": ""Obrigado!"",
+      ""idReceptor"": 8
+    }
+  ]
+}
+```
+
+### Resposta:
+```json
+{
+  ""sucessos"": 2,
+  ""falhas"": 0,
+  ""detalhes"": [
+    {
+      ""idReceptor"": 5,
+      ""status"": ""sucesso"",
+      ""id"": 156
+    },
+    {
+      ""idReceptor"": 8,
+      ""status"": ""sucesso"",
+      ""id"": 157
+    }
+  ]
+}
+```
+
+## Autenticação
+
+Para acessar os endpoints protegidos:
+1. Registre-se em `/api/v1/auth/register` ou faça login em `/api/v1/auth/login`
+2. Copie o token JWT retornado
+3. Clique no botão **Authorize** (🔒) no topo desta página
+4. Digite: `{seu_token}`
+5. Clique em **Authorize** e feche o modal"
+    });
+
+    // Configuração para separar endpoints por versão no Swagger
+    c.DocInclusionPredicate((version, desc) =>
+    {
+        // Pega a versão da rota
+        if (desc.RelativePath != null && desc.RelativePath.Contains("/v"))
+        {
+            var routeVersion = desc.RelativePath.Split('/')[1]; // ex: "v1" ou "v2"
+            return routeVersion.StartsWith(version.Replace(".", ""));
+        }
+        
+        return version == "v1"; // default para v1
+    });
+
     // Include XML comments for better documentation
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
@@ -215,14 +299,19 @@ builder.Services.AddVersionedApiExplorer(options =>
 
 var app = builder.Build();
 
+var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
+
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "AuraPlus API v1.0");
-        c.RoutePrefix = string.Empty; // Swagger na raiz
+        foreach (var description in provider.ApiVersionDescriptions)
+        {
+            c.SwaggerEndpoint($"/swagger/{description.GroupName}/swagger.json", $"AuraPlus API v{description.ApiVersion}");
+            c.RoutePrefix = string.Empty; // Swagger na raiz
+        }
     });
 }
 

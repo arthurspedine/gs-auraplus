@@ -66,7 +66,6 @@ O **AuraPlus** é uma API RESTful desenvolvida em .NET 9 que implementa um siste
    - Reconhecimento de colaborador para colaborador
    - Fortalece cultura organizacional
    - **Regras**: 
-     - 1 reconhecimento por dia
      - Mesma pessoa 1x por mês
      - Apenas membros da mesma equipe
      - Não pode reconhecer a si mesmo
@@ -182,11 +181,16 @@ DELETE /api/v1/Equipe/membros/{membroId}    # Remover membro da sua equipe
 
 ### Reconhecimentos
 ```
-POST   /api/v1/Reconhecimento               # Criar reconhecimento (1 por dia)
+POST   /api/v1/Reconhecimento               # Criar reconhecimento
 GET    /api/v1/Reconhecimento/{id}          # Obter reconhecimento específico
 GET    /api/v1/Reconhecimento/enviados      # Listar reconhecimentos enviados
 GET    /api/v1/Reconhecimento/recebidos     # Listar reconhecimentos recebidos
 DELETE /api/v1/Reconhecimento/{id}          # Deletar reconhecimento próprio
+```
+
+### Reconhecimentos V2 (Em Massa)
+```
+POST   /api/v2/Reconhecimento/em-massa      # Criar múltiplos reconhecimentos (máx 10)
 ```
 
 ### Sentimentos

@@ -11,6 +11,7 @@ namespace AuraPlus.Web.Controllers;
 [ApiController]
 [Route("api/v{version:apiVersion}/[controller]")]
 [ApiVersion("1.0")]
+[ApiVersion("2.0")]
 [Authorize]
 [Produces("application/json")]
 public class ReconhecimentoController : ControllerBase
@@ -25,9 +26,9 @@ public class ReconhecimentoController : ControllerBase
     }
 
     /// <summary>
-    /// Criar um reconhecimento (1 por dia, mesma pessoa 1x por mês)
+    /// Criar um reconhecimento
     /// </summary>
-    [HttpPost]
+    [HttpPost, MapToApiVersion("1.0")]
     [ProducesResponseType(typeof(ReconhecimentoDTO), (int)HttpStatusCode.Created)]
     [ProducesResponseType((int)HttpStatusCode.BadRequest)]
     [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
@@ -54,6 +55,38 @@ public class ReconhecimentoController : ControllerBase
             return StatusCode(500, new { message = "Erro interno ao criar reconhecimento" });
         }
     }
+
+    /// <summary>
+    /// Criar múltiplos reconhecimentos de uma vez (máximo 10)
+    /// </summary>
+    [HttpPost("em-massa"), MapToApiVersion("2.0")]
+    [ProducesResponseType(typeof(ReconhecimentoEmMassaResultDTO), (int)HttpStatusCode.OK)]
+    [ProducesResponseType((int)HttpStatusCode.BadRequest)]
+    [ProducesResponseType((int)HttpStatusCode.Unauthorized)]
+    public async Task<ActionResult<ReconhecimentoEmMassaResultDTO>> CreateReconhecimentoEmMassa(CreateReconhecimentoEmMassaDTO dto)
+    {
+        try
+        {
+            var usuarioId = GetAuthenticatedUserId();
+            var resultado = await _reconhecimentoService.CreateReconhecimentoEmMassaAsync(usuarioId, dto);
+            
+            return Ok(resultado);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao criar reconhecimentos em massa");
+            return StatusCode(500, new { message = "Erro interno ao criar reconhecimentos em massa" });
+        }
+    }
+
 
     /// <summary>
     /// Obter reconhecimento por ID

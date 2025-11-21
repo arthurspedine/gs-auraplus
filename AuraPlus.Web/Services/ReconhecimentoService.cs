@@ -50,10 +50,6 @@ public class ReconhecimentoService : IReconhecimentoService
         if (reconhecedorId == dto.IdReconhecido)
             throw new InvalidOperationException("Você não pode reconhecer a si mesmo.");
 
-        // Regra: 1 reconhecimento por dia
-        if (await _reconhecimentoRepository.JaReconheceuHojeAsync(reconhecedorId))
-            throw new InvalidOperationException("Você já fez um reconhecimento hoje. Apenas 1 reconhecimento por dia é permitido.");
-
         // Regra: mesma pessoa 1x por mês
         var agora = DateTime.Now;
         if (await _reconhecimentoRepository.JaReconheceuPessoaNoMesAsync(reconhecedorId, dto.IdReconhecido, agora))
@@ -77,6 +73,115 @@ public class ReconhecimentoService : IReconhecimentoService
         reconhecimento = await _reconhecimentoRepository.GetByIdAsync(reconhecimento.Id) ?? reconhecimento;
 
         return ReconhecimentoDTO.FromReconhecimento(reconhecimento);
+    }
+
+    public async Task<ReconhecimentoEmMassaResultDTO> CreateReconhecimentoEmMassaAsync(int reconhecedorId, CreateReconhecimentoEmMassaDTO dto)
+    {
+        var result = new ReconhecimentoEmMassaResultDTO();
+
+        // Validar reconhecedor uma vez
+        var reconhecedor = await _userRepository.GetByIdAsync(reconhecedorId);
+        if (reconhecedor == null)
+            throw new KeyNotFoundException("Reconhecedor não encontrado.");
+
+        if (reconhecedor.Ativo == '0')
+            throw new InvalidOperationException("Reconhecedor está inativo.");
+
+        if (!reconhecedor.IdEquipe.HasValue)
+            throw new InvalidOperationException("Você deve estar em uma equipe para fazer reconhecimentos.");
+
+        // Processar cada reconhecimento
+        foreach (var item in dto.Reconhecimentos)
+        {
+            var detalhe = new ReconhecimentoDetalheDTO
+            {
+                IdReceptor = item.IdReceptor
+            };
+
+            try
+            {
+                // Validar reconhecido
+                var reconhecido = await _userRepository.GetByIdAsync(item.IdReceptor);
+                if (reconhecido == null)
+                {
+                    detalhe.Status = "falha";
+                    detalhe.Erro = "Usuário reconhecido não encontrado";
+                    result.Detalhes.Add(detalhe);
+                    result.Falhas++;
+                    continue;
+                }
+
+                if (reconhecido.Ativo == '0')
+                {
+                    detalhe.Status = "falha";
+                    detalhe.Erro = "Usuário reconhecido está inativo";
+                    result.Detalhes.Add(detalhe);
+                    result.Falhas++;
+                    continue;
+                }
+
+                // Validar que o reconhecido está na mesma equipe
+                if (reconhecido.IdEquipe != reconhecedor.IdEquipe)
+                {
+                    detalhe.Status = "falha";
+                    detalhe.Erro = "Só é possível reconhecer membros da sua equipe";
+                    result.Detalhes.Add(detalhe);
+                    result.Falhas++;
+                    continue;
+                }
+
+                // Não pode reconhecer a si mesmo
+                if (reconhecedorId == item.IdReceptor)
+                {
+                    detalhe.Status = "falha";
+                    detalhe.Erro = "Você não pode reconhecer a si mesmo";
+                    result.Detalhes.Add(detalhe);
+                    result.Falhas++;
+                    continue;
+                }
+
+                // Regra: mesma pessoa 1x por mês
+                var agora = DateTime.Now;
+                if (await _reconhecimentoRepository.JaReconheceuPessoaNoMesAsync(reconhecedorId, item.IdReceptor, agora))
+                {
+                    detalhe.Status = "falha";
+                    detalhe.Erro = "Você já reconheceu esta pessoa este mês";
+                    result.Detalhes.Add(detalhe);
+                    result.Falhas++;
+                    continue;
+                }
+
+                // Criar reconhecimento
+                var reconhecimento = new Reconhecimento
+                {
+                    Titulo = item.Titulo,
+                    Descricao = item.Descricao,
+                    Data = DateTime.Now,
+                    IdReconhecedor = reconhecedorId,
+                    IdReconhecido = item.IdReceptor
+                };
+
+                reconhecimento = await _reconhecimentoRepository.AddAsync(reconhecimento);
+
+                detalhe.Status = "sucesso";
+                detalhe.Id = reconhecimento.Id;
+                result.Detalhes.Add(detalhe);
+                result.Sucessos++;
+
+                _logger.LogInformation("Reconhecimento em massa: {Reconhecedor} reconheceu {Reconhecido}", 
+                    reconhecedor.Nome, reconhecido.Nome);
+            }
+            catch (Exception ex)
+            {
+                detalhe.Status = "falha";
+                detalhe.Erro = $"Erro inesperado: {ex.Message}";
+                result.Detalhes.Add(detalhe);
+                result.Falhas++;
+                _logger.LogError(ex, "Erro ao processar reconhecimento em massa para receptor {ReceptorId}", item.IdReceptor);
+            }
+        }
+
+        return result;
     }
 
     public async Task<ReconhecimentoDTO?> GetReconhecimentoByIdAsync(int id)
