@@ -2,9 +2,9 @@
 
 ## 👥 Integrantes
 
-- **Arthur Spedine**
-- **Matheus Esteves**
-- **Gabriel Falanga**
+- **Arthur Spedine** | RM554489
+- **Gabriel Falanga** | RM554769
+- **Matheus Esteves** | RM555061
 
 ## 📋 Descrição do Projeto
 
